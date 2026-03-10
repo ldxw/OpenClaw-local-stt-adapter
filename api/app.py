@@ -1,12 +1,15 @@
 """
-Whisper STT API 服务
-用于接收语音并发送到 Redis 队列
+Whisper STT API
 
 兼容：
 OpenAI API
 OpenClaw
 小龙虾
 QQBot
+
+负责：
+接收音频
+写入 Redis 队列
 """
 
 import os
@@ -17,30 +20,26 @@ import redis
 from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException
 from fastapi.responses import HTMLResponse
 
-
 # Redis 地址
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
-# API Token（可选）
+# API Token
 API_TOKEN = os.getenv("API_TOKEN", "")
 
 # Redis 连接
 redis_conn = redis.from_url(REDIS_URL)
 
-# Redis Stream 队列名称
+# 队列名称
 STREAM = "stt_jobs"
 
 # 启动时间
 START_TIME = time.time()
 
-# FastAPI 实例
 app = FastAPI(title="Whisper STT API")
 
 
 def check_auth(auth):
-    """
-    检查 API Token
-    """
+    """检查 Token"""
 
     if not API_TOKEN:
         return
@@ -56,10 +55,7 @@ def check_auth(auth):
 
 @app.get("/healthz")
 def health():
-    """
-    健康检查接口
-    用于 Docker / 监控检测
-    """
+    """健康检查"""
 
     try:
         redis_conn.ping()
@@ -81,10 +77,7 @@ def health():
 
 @app.get("/v1/models")
 def models():
-    """
-    返回支持的模型
-    OpenAI API 兼容
-    """
+    """OpenAI 兼容模型接口"""
 
     return {
         "object": "list",
@@ -102,25 +95,19 @@ async def transcribe(
         language: str = Form(None),
         authorization: str = Header(None)
 ):
-    """
-    语音识别接口
-    """
+    """语音识别入口"""
 
     check_auth(authorization)
 
-    # 读取音频
     content = await file.read()
 
-    # 生成任务ID
     job_id = str(uuid.uuid4())
 
-    # 保存临时文件
     path = f"/tmp/{job_id}.audio"
 
     with open(path, "wb") as f:
         f.write(content)
 
-    # 写入 Redis 队列
     redis_conn.xadd(
         STREAM,
         {
@@ -135,9 +122,7 @@ async def transcribe(
 
 @app.get("/docs", response_class=HTMLResponse)
 def docs():
-    """
-    返回 API 文档页面
-    """
+    """返回 API 文档"""
 
     with open("docs/docs.html") as f:
         return f.read()

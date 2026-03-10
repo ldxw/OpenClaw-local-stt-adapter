@@ -3,3 +3,4 @@ uvicorn[standard]==0.34.0
 python-multipart==0.0.20
 faster-whisper==1.1.1
 requests>=2.31.0
+huggingface_hub>=0.24.0

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from faster_whisper import WhisperModel
@@ -19,12 +20,38 @@ MODEL_SIZE = os.getenv("WHISPER_MODEL") or "small"
 DEVICE = os.getenv("WHISPER_DEVICE") or "cpu"
 COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE") or "int8"
 DEFAULT_LANGUAGE = os.getenv("DEFAULT_LANGUAGE") or "zh"
+
 API_TOKEN = (os.getenv("API_TOKEN") or "").strip()
+API_TOKENS_RAW = os.getenv("API_TOKENS") or ""
+API_TOKENS = {x.strip() for x in API_TOKENS_RAW.split(",") if x.strip()}
+if API_TOKEN:
+    API_TOKENS.add(API_TOKEN)
+
+CORS_ALLOW_ORIGINS_RAW = os.getenv("CORS_ALLOW_ORIGINS") or ""
+CORS_ALLOW_ORIGINS = [x.strip() for x in CORS_ALLOW_ORIGINS_RAW.split(",") if x.strip()]
+ALLOW_ALL_ORIGINS = "*" in CORS_ALLOW_ORIGINS
 
 AUDIO_PREVIEW_DIR = Path("/tmp/local-stt-audio-preview")
 AUDIO_PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_TEST_TEXT = "你好，这是本地语音识别测试。现在正在验证文字生成语音、播放和转写链路是否正常。"
+
+if ALLOW_ALL_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+elif CORS_ALLOW_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ALLOW_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)
 
@@ -32,10 +59,12 @@ app.mount("/preview", StaticFiles(directory=str(AUDIO_PREVIEW_DIR)), name="previ
 
 
 def check_auth(authorization: Optional[str]) -> None:
-    if not API_TOKEN:
+    if not API_TOKENS:
         return
-    expected = f"Bearer {API_TOKEN}"
-    if authorization != expected:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    token = authorization.removeprefix("Bearer ").strip()
+    if token not in API_TOKENS:
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
@@ -136,7 +165,13 @@ def save_preview_audio(source_path: str) -> str:
 
 
 def render_index() -> str:
-    token_hint = "已启用 Bearer Token 鉴权" if API_TOKEN else "未启用鉴权"
+    token_hint = "已启用 Bearer Token 鉴权" if API_TOKENS else "未启用鉴权"
+    cors_hint = "未配置"
+    if ALLOW_ALL_ORIGINS:
+        cors_hint = "允许全部来源 *"
+    elif CORS_ALLOW_ORIGINS:
+        cors_hint = ", ".join(CORS_ALLOW_ORIGINS)
+
     default_text = html.escape(DEFAULT_TEST_TEXT)
 
     return f"""
@@ -150,7 +185,6 @@ def render_index() -> str:
         :root {{
           --bg: #f5f7fb;
           --card: rgba(255,255,255,0.88);
-          --card-strong: #ffffff;
           --text: #172033;
           --muted: #667085;
           --line: #e6eaf2;
@@ -167,11 +201,7 @@ def render_index() -> str:
           --shadow: 0 8px 32px rgba(17, 24, 39, 0.08);
           --radius: 18px;
         }}
-
-        * {{
-          box-sizing: border-box;
-        }}
-
+        * {{ box-sizing: border-box; }}
         body {{
           margin: 0;
           font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC",
@@ -182,15 +212,12 @@ def render_index() -> str:
             radial-gradient(circle at top right, rgba(16,185,129,0.06), transparent 24%),
             var(--bg);
         }}
-
         .container {{
           max-width: 1120px;
           margin: 0 auto;
           padding: 28px 16px 48px;
         }}
-
         .hero {{
-          position: relative;
           overflow: hidden;
           border: 1px solid rgba(255,255,255,0.55);
           background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(248,250,252,0.88));
@@ -200,31 +227,17 @@ def render_index() -> str:
           margin-bottom: 20px;
           backdrop-filter: blur(8px);
         }}
-
-        .hero::after {{
-          content: "";
-          position: absolute;
-          right: -50px;
-          top: -50px;
-          width: 180px;
-          height: 180px;
-          background: radial-gradient(circle, rgba(59,130,246,0.14), transparent 70%);
-          pointer-events: none;
-        }}
-
         .hero h1 {{
           margin: 0 0 8px;
           font-size: 32px;
           line-height: 1.15;
           letter-spacing: -0.02em;
         }}
-
         .hero p {{
           margin: 0;
           color: var(--muted);
           font-size: 15px;
         }}
-
         .hero-top {{
           display: flex;
           align-items: center;
@@ -232,7 +245,6 @@ def render_index() -> str:
           flex-wrap: wrap;
           margin-bottom: 10px;
         }}
-
         .badge {{
           display: inline-flex;
           align-items: center;
@@ -244,19 +256,16 @@ def render_index() -> str:
           color: #334155;
           border: 1px solid #dde4ee;
         }}
-
         .badge.ok {{
           background: #e9f9ee;
           border-color: #bce8c9;
           color: #166534;
         }}
-
         .grid {{
           display: grid;
           grid-template-columns: 1.1fr 0.9fr;
           gap: 18px;
         }}
-
         .card {{
           border: 1px solid rgba(230,234,242,0.95);
           border-radius: var(--radius);
@@ -265,47 +274,22 @@ def render_index() -> str:
           box-shadow: var(--shadow);
           backdrop-filter: blur(8px);
         }}
-
         .card h2 {{
           margin: 0 0 10px;
           font-size: 18px;
           letter-spacing: -0.01em;
         }}
-
-        .card p {{
-          margin: 0 0 8px;
-        }}
-
-        .muted {{
-          color: var(--muted);
-        }}
-
-        .stack {{
-          display: grid;
-          gap: 18px;
-        }}
-
-        .meta-list {{
-          margin: 0;
-          padding-left: 18px;
-          color: var(--text);
-        }}
-
-        .meta-list li {{
-          margin: 6px 0;
-        }}
-
+        .section-desc {{ margin: 0; color: var(--muted); font-size: 14px; }}
+        .stack {{ display: grid; gap: 18px; }}
+        .meta-list {{ margin: 0; padding-left: 18px; }}
+        .meta-list li {{ margin: 6px 0; }}
         label {{
           display: block;
           font-weight: 600;
           margin: 14px 0 8px;
           font-size: 14px;
         }}
-
-        input[type="text"],
-        input[type="password"],
-        select,
-        textarea {{
+        input[type="text"], input[type="password"], select, textarea {{
           width: 100%;
           border: 1px solid #d6dce7;
           border-radius: 12px;
@@ -314,38 +298,16 @@ def render_index() -> str:
           background: #fff;
           color: var(--text);
           outline: none;
-          transition: border-color .15s ease, box-shadow .15s ease;
         }}
-
-        input[type="text"]:focus,
-        input[type="password"]:focus,
-        select:focus,
-        textarea:focus {{
-          border-color: rgba(59,130,246,0.65);
-          box-shadow: 0 0 0 4px rgba(59,130,246,0.10);
+        textarea {{ min-height: 132px; resize: vertical; }}
+        input[type="file"] {{ display: block; width: 100%; padding: 10px 0 2px; }}
+        .row {{ display: flex; gap: 12px; flex-wrap: wrap; }}
+        .row > * {{ flex: 1 1 220px; }}
+        .cmd-actions {{
+          display: grid;
+          gap: 8px;
+          margin-top: 10px;
         }}
-
-        textarea {{
-          min-height: 132px;
-          resize: vertical;
-        }}
-
-        input[type="file"] {{
-          display: block;
-          width: 100%;
-          padding: 10px 0 2px;
-        }}
-
-        .row {{
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-        }}
-
-        .row > * {{
-          flex: 1 1 220px;
-        }}
-
         button {{
           margin-top: 16px;
           border: 0;
@@ -356,39 +318,17 @@ def render_index() -> str:
           background: var(--primary);
           color: #fff;
           cursor: pointer;
-          transition: transform .08s ease, background-color .15s ease, opacity .15s ease;
         }}
-
-        button:hover {{
-          background: var(--primary-hover);
-        }}
-
-        button:active {{
-          transform: translateY(1px);
-        }}
-
-        button:disabled {{
-          opacity: .65;
-          cursor: not-allowed;
-        }}
-
-        .copy-btn,
-        .ghost-btn {{
-          background: var(--secondary);
-        }}
-
-        .copy-btn:hover,
-        .ghost-btn:hover {{
-          background: var(--secondary-hover);
-        }}
-
+        button:hover {{ background: var(--primary-hover); }}
+        button:disabled {{ opacity: .65; cursor: not-allowed; }}
+        .copy-btn, .ghost-btn {{ background: var(--secondary); }}
+        .copy-btn:hover, .ghost-btn:hover {{ background: var(--secondary-hover); }}
         .result {{
           background: #fbfcfe;
           border: 1px solid var(--line);
           border-radius: 14px;
           padding: 16px;
         }}
-
         .success {{
           background: var(--success-bg);
           border: 1px solid var(--success-border);
@@ -396,7 +336,6 @@ def render_index() -> str:
           border-radius: 12px;
           padding: 14px;
         }}
-
         .error {{
           background: var(--error-bg);
           border: 1px solid var(--error-border);
@@ -404,7 +343,6 @@ def render_index() -> str:
           border-radius: 12px;
           padding: 14px;
         }}
-
         pre {{
           margin: 10px 0 0;
           background: #0f172a;
@@ -417,11 +355,6 @@ def render_index() -> str:
           font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
           line-height: 1.55;
         }}
-
-        code, textarea {{
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        }}
-
         details {{
           margin-top: 12px;
           border: 1px solid #e5eaf3;
@@ -429,11 +362,6 @@ def render_index() -> str:
           background: rgba(250,251,253,0.92);
           overflow: hidden;
         }}
-
-        details[open] {{
-          background: rgba(247,249,252,0.98);
-        }}
-
         summary {{
           cursor: pointer;
           font-weight: 700;
@@ -441,47 +369,9 @@ def render_index() -> str:
           user-select: none;
           list-style: none;
         }}
-
-        summary::-webkit-details-marker {{
-          display: none;
-        }}
-
-        summary::after {{
-          content: "展开";
-          float: right;
-          font-weight: 600;
-          font-size: 12px;
-          color: var(--muted);
-        }}
-
-        details[open] summary::after {{
-          content: "收起";
-        }}
-
-        .details-body {{
-          padding: 0 16px 16px;
-        }}
-
-        audio {{
-          width: 100%;
-          margin-top: 10px;
-        }}
-
-        .hidden {{
-          display: none;
-        }}
-
-        .section-title {{
-          margin: 0 0 4px;
-          font-size: 18px;
-        }}
-
-        .section-desc {{
-          margin: 0;
-          color: var(--muted);
-          font-size: 14px;
-        }}
-
+        .details-body {{ padding: 0 16px 16px; }}
+        audio {{ width: 100%; margin-top: 10px; }}
+        .hidden {{ display: none; }}
         .loading {{
           display: inline-flex;
           align-items: center;
@@ -490,7 +380,6 @@ def render_index() -> str:
           font-size: 14px;
           margin-top: 12px;
         }}
-
         .spinner {{
           width: 16px;
           height: 16px;
@@ -499,19 +388,10 @@ def render_index() -> str:
           border-radius: 50%;
           animation: spin .8s linear infinite;
         }}
-
-        @keyframes spin {{
-          to {{ transform: rotate(360deg); }}
-        }}
-
+        @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
         @media (max-width: 900px) {{
-          .grid {{
-            grid-template-columns: 1fr;
-          }}
-
-          .hero h1 {{
-            font-size: 26px;
-          }}
+          .grid {{ grid-template-columns: 1fr; }}
+          .hero h1 {{ font-size: 26px; }}
         }}
       </style>
     </head>
@@ -522,29 +402,31 @@ def render_index() -> str:
             <h1>Local STT Adapter</h1>
             <span id="verifyBadge" class="badge">请先验证密钥</span>
           </div>
-          <p>纯本地语音转写适配服务，兼容 OpenAI 风格的 <code>/v1/audio/transcriptions</code> 接口。支持网页在线测试、文字生成语音试听，以及 OpenClaw 对接示例。</p>
+          <p>纯本地语音转写适配服务，兼容 OpenAI 风格的 <code>/v1/audio/transcriptions</code> 接口。支持 AJAX 在线测试、文字生成语音试听、OpenClaw 对接示例，以及多密钥和跨域配置。</p>
         </section>
 
         <div class="grid">
           <div class="stack">
             <div class="card">
-              <h2 class="section-title">当前配置</h2>
-              <p class="section-desc">这里显示当前服务运行参数，方便确认模型和设备是否符合预期。</p>
+              <h2>当前配置</h2>
+              <p class="section-desc">这里显示当前服务运行参数，方便确认模型、设备、跨域和鉴权状态。</p>
               <ul class="meta-list">
                 <li><strong>模型：</strong>{html.escape(MODEL_SIZE)}</li>
                 <li><strong>设备：</strong>{html.escape(DEVICE)}</li>
                 <li><strong>计算类型：</strong>{html.escape(COMPUTE_TYPE)}</li>
                 <li><strong>默认语言：</strong>{html.escape(DEFAULT_LANGUAGE)}</li>
                 <li><strong>鉴权状态：</strong>{token_hint}</li>
+                <li><strong>多密钥数量：</strong>{len(API_TOKENS)}</li>
+                <li><strong>CORS 允许来源：</strong>{html.escape(cors_hint)}</li>
               </ul>
             </div>
 
             <div class="card">
-              <h2 class="section-title">第一步：验证密钥</h2>
-              <p class="section-desc">只填写 token 本身，不要加 <code>Bearer</code> 前缀。验证成功后，在线测试区域会自动展开。</p>
+              <h2>第一步：验证密钥</h2>
+              <p class="section-desc">支持多个 token。这里只填 token 本身，不要加 <code>Bearer</code> 前缀。</p>
               <form id="verifyForm">
                 <label for="token">Token</label>
-                <input id="token" name="token" type="password" placeholder="输入你的 API Token" />
+                <input id="token" name="token" type="password" placeholder="输入任一有效 API Token" />
                 <div class="row">
                   <button type="submit" id="verifyBtn">验证密钥</button>
                   <button type="button" id="clearSavedTokenBtn" class="ghost-btn">清除本地保存密钥</button>
@@ -559,7 +441,7 @@ def render_index() -> str:
 
             <div id="testingSection" class="hidden stack">
               <div class="card">
-                <h2 class="section-title">在线测试：上传音频</h2>
+                <h2>在线测试：上传音频</h2>
                 <p class="section-desc">上传一段音频文件，直接查看转写结果。</p>
                 <form id="uploadTestForm">
                   <label for="language">语言</label>
@@ -583,7 +465,7 @@ def render_index() -> str:
               </div>
 
               <div class="card">
-                <h2 class="section-title">在线测试：文字生成语音并转写</h2>
+                <h2>在线测试：文字生成语音并转写</h2>
                 <p class="section-desc">输入文本，生成本地测试语音，再自动做转写校验。</p>
                 <form id="textTestForm">
                   <label for="language2">语言</label>
@@ -620,27 +502,33 @@ def render_index() -> str:
 
           <div class="stack">
             <div class="card">
-              <h2 class="section-title">命令测试接口</h2>
-              <p class="section-desc">这个区域始终公开显示，不需要先验证密钥。复制后把 <code>你的Token</code> 替换成真实值即可。</p>
-              <div class="row">
-                <button type="button" id="copyHealthBtn" class="copy-btn">复制健康检查命令</button>
-                <button type="button" id="copyTranscribeBtn" class="copy-btn">复制转写命令</button>
-              </div>
-              <pre id="healthCmd">curl "http://127.0.0.1:8080/healthz" \\
+              <h2>命令测试接口</h2>
+              <p class="section-desc">这个区域始终公开显示。复制后把 <code>你的Token</code> 替换成任一有效 token 即可。</p>
+
+              <h3 style="margin:18px 0 6px;">健康检查</h3>
+              <pre id="healthCmd">curl "__BASE_ORIGIN__/healthz" \\
   -H "Authorization: Bearer 你的Token"</pre>
-              <pre id="transcribeCmd">curl -X POST "http://127.0.0.1:8080/v1/audio/transcriptions" \\
+              <div class="cmd-actions">
+                <button type="button" id="copyHealthBtn" class="copy-btn">复制健康检查命令</button>
+              </div>
+
+              <h3 style="margin:18px 0 6px;">音频转写</h3>
+              <pre id="transcribeCmd">curl -X POST "__BASE_ORIGIN__/v1/audio/transcriptions" \\
   -H "Authorization: Bearer 你的Token" \\
   -F "file=@test.wav" \\
   -F "language=zh"</pre>
+              <div class="cmd-actions">
+                <button type="button" id="copyTranscribeBtn" class="copy-btn">复制转写命令</button>
+              </div>
 
               <details>
                 <summary>查看 OpenClaw 对接示例</summary>
                 <div class="details-body">
-                  <pre>openclaw config set tools.media.audio.enabled 'true'
+                  <pre id="openclawCmd">openclaw config set tools.media.audio.enabled 'true'
 openclaw config set tools.media.audio.maxBytes '20971520'
 openclaw config set tools.media.audio.timeoutSeconds '120'
 openclaw config set tools.media.audio.echoTranscript 'false'
-openclaw config set tools.media.audio.baseUrl '"http://127.0.0.1:8080/v1"'
+openclaw config set tools.media.audio.baseUrl '"__BASE_ORIGIN__/v1"'
 openclaw config set tools.media.audio.headers '{{"Authorization":"Bearer 你的Token"}}'
 openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"whisper-1"}}]'</pre>
                 </div>
@@ -696,6 +584,28 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
           if (btn) btn.disabled = loading;
         }}
 
+        function buildDynamicCommands() {{
+          const base = window.location.origin;
+          document.getElementById("healthCmd").innerText =
+`curl "${{base}}/healthz" \\
+  -H "Authorization: Bearer 你的Token"`;
+
+          document.getElementById("transcribeCmd").innerText =
+`curl -X POST "${{base}}/v1/audio/transcriptions" \\
+  -H "Authorization: Bearer 你的Token" \\
+  -F "file=@test.wav" \\
+  -F "language=zh"`;
+
+          document.getElementById("openclawCmd").innerText =
+`openclaw config set tools.media.audio.enabled 'true'
+openclaw config set tools.media.audio.maxBytes '20971520'
+openclaw config set tools.media.audio.timeoutSeconds '120'
+openclaw config set tools.media.audio.echoTranscript 'false'
+openclaw config set tools.media.audio.baseUrl '"${{base}}/v1"'
+openclaw config set tools.media.audio.headers '{"Authorization":"Bearer 你的Token"}'
+openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"whisper-1"}}]'`;
+        }}
+
         function copyText(text) {{
           navigator.clipboard.writeText(text).then(() => {{
             verifyMessage.innerHTML = `<div class="success">命令已复制到剪贴板。</div>`;
@@ -722,7 +632,7 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
         function renderUploadResult(data) {{
           resultBox.innerHTML = `
             <div class="card">
-              <h2 class="section-title">上传测试结果</h2>
+              <h2>上传测试结果</h2>
               <div class="result">
                 <p><strong>文件名：</strong>${{escapeHtml(data.filename || "")}}</p>
                 <p><strong>识别语言：</strong>${{escapeHtml(data.language || "")}}</p>
@@ -737,7 +647,7 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
         function renderTextResult(data) {{
           resultBox.innerHTML = `
             <div class="card">
-              <h2 class="section-title">文字生成语音测试结果</h2>
+              <h2>文字生成语音测试结果</h2>
               <div class="result">
                 <p><strong>原始文本：</strong></p>
                 <pre>${{escapeHtml(data.original_text || "")}}</pre>
@@ -759,7 +669,7 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
         function renderError(title, message) {{
           resultBox.innerHTML = `
             <div class="card">
-              <h2 class="section-title">${{escapeHtml(title)}}</h2>
+              <h2>${{escapeHtml(title)}}</h2>
               <div class="error">${{escapeHtml(message)}}</div>
             </div>
           `;
@@ -769,11 +679,16 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
           const formData = new FormData();
           formData.append("token", token);
 
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 10000);
+
           try {{
             setLoading(verifyLoading, verifyBtn, true);
+
             const resp = await fetch("/verify-json", {{
               method: "POST",
-              body: formData
+              body: formData,
+              signal: controller.signal
             }});
             const data = await resp.json();
 
@@ -788,9 +703,14 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
             setVerifySuccess(silent ? "已自动恢复并验证本地保存的密钥。" : "密钥验证通过，在线测试表单已开放。");
             return true;
           }} catch (err) {{
-            setVerifyError("请求失败：" + err);
+            if (err.name === "AbortError") {{
+              setVerifyError("验证超时，请检查页面域名、反代或 CORS 配置。");
+            }} else {{
+              setVerifyError("请求失败：" + err);
+            }}
             return false;
           }} finally {{
+            clearTimeout(timer);
             setLoading(verifyLoading, verifyBtn, false);
           }}
         }}
@@ -902,10 +822,14 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
         }});
 
         window.addEventListener("DOMContentLoaded", async function () {{
+          buildDynamicCommands();
+
           const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
           if (savedToken) {{
             tokenInput.value = savedToken;
             await verifyToken(savedToken, true);
+          }} else {{
+            setLoading(verifyLoading, verifyBtn, false);
           }}
         }});
       </script>

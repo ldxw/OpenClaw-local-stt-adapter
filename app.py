@@ -10,11 +10,17 @@ from typing import Optional
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from faster_whisper import WhisperModel
 
-app = FastAPI(title="Local STT Adapter")
+DOCS_BASE_PATH = (os.getenv("DOCS_BASE_PATH") or "").strip()
+if DOCS_BASE_PATH:
+    if not DOCS_BASE_PATH.startswith("/"):
+        DOCS_BASE_PATH = "/" + DOCS_BASE_PATH
+    DOCS_BASE_PATH = DOCS_BASE_PATH.rstrip("/")
+else:
+    DOCS_BASE_PATH = "/docs"
 
 MODEL_SIZE = os.getenv("WHISPER_MODEL") or "small"
 DEVICE = os.getenv("WHISPER_DEVICE") or "cpu"
@@ -31,10 +37,7 @@ CORS_ALLOW_ORIGINS_RAW = os.getenv("CORS_ALLOW_ORIGINS") or ""
 CORS_ALLOW_ORIGINS = [x.strip() for x in CORS_ALLOW_ORIGINS_RAW.split(",") if x.strip()]
 ALLOW_ALL_ORIGINS = "*" in CORS_ALLOW_ORIGINS
 
-AUDIO_PREVIEW_DIR = Path("/tmp/local-stt-audio-preview")
-AUDIO_PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
-
-DEFAULT_TEST_TEXT = "你好，这是本地语音识别测试。现在正在验证文字生成语音、播放和转写链路是否正常。"
+app = FastAPI(title="Local STT Adapter")
 
 if ALLOW_ALL_ORIGINS:
     app.add_middleware(
@@ -52,6 +55,11 @@ elif CORS_ALLOW_ORIGINS:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+AUDIO_PREVIEW_DIR = Path("/tmp/local-stt-audio-preview")
+AUDIO_PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+
+DEFAULT_TEST_TEXT = "你好，这是本地语音识别测试。现在正在验证文字生成语音、播放和转写链路是否正常。"
 
 model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)
 
@@ -164,6 +172,73 @@ def save_preview_audio(source_path: str) -> str:
     return f"/preview/{target_name}"
 
 
+def render_root_landing() -> str:
+    return f"""
+    <!doctype html>
+    <html lang="zh-CN">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Local STT Adapter</title>
+      <style>
+        body {{
+          margin: 0;
+          font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+          background: #f6f8fb;
+          color: #172033;
+        }}
+        .wrap {{
+          max-width: 760px;
+          margin: 72px auto;
+          padding: 0 16px;
+        }}
+        .card {{
+          background: #fff;
+          border: 1px solid #e6eaf2;
+          border-radius: 20px;
+          padding: 28px;
+          box-shadow: 0 8px 32px rgba(17,24,39,.08);
+        }}
+        h1 {{
+          margin: 0 0 10px;
+          font-size: 30px;
+        }}
+        p {{
+          color: #667085;
+          line-height: 1.7;
+        }}
+        a.btn {{
+          display: inline-block;
+          margin-top: 16px;
+          background: #2563eb;
+          color: #fff;
+          text-decoration: none;
+          padding: 12px 18px;
+          border-radius: 12px;
+          font-weight: 700;
+        }}
+        code {{
+          background: #f3f4f6;
+          padding: 2px 6px;
+          border-radius: 6px;
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <div class="card">
+          <h1>Local STT Adapter</h1>
+          <p>这是服务默认首页。</p>
+          <p>说明页面入口：</p>
+          <p><code>{html.escape(DOCS_BASE_PATH)}/</code></p>
+          <a class="btn" href="{html.escape(DOCS_BASE_PATH)}/">打开说明页面</a>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+
+
 def render_index() -> str:
     token_hint = "已启用 Bearer Token 鉴权" if API_TOKENS else "未启用鉴权"
     cors_hint = "未配置"
@@ -180,7 +255,7 @@ def render_index() -> str:
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Local STT Adapter</title>
+      <title>Local STT Adapter Docs</title>
       <style>
         :root {{
           --bg: #f5f7fb;
@@ -399,10 +474,10 @@ def render_index() -> str:
       <div class="container">
         <section class="hero">
           <div class="hero-top">
-            <h1>Local STT Adapter</h1>
+            <h1>Local STT Adapter Docs</h1>
             <span id="verifyBadge" class="badge">请先验证密钥</span>
           </div>
-          <p>纯本地语音转写适配服务，兼容 OpenAI 风格的 <code>/v1/audio/transcriptions</code> 接口。支持 AJAX 在线测试、文字生成语音试听、OpenClaw 对接示例，以及多密钥和跨域配置。</p>
+          <p>这是说明页面。接口地址保持原始路径不变，只是说明页可以放在自定义二级目录下。</p>
         </section>
 
         <div class="grid">
@@ -418,6 +493,8 @@ def render_index() -> str:
                 <li><strong>鉴权状态：</strong>{token_hint}</li>
                 <li><strong>多密钥数量：</strong>{len(API_TOKENS)}</li>
                 <li><strong>CORS 允许来源：</strong>{html.escape(cors_hint)}</li>
+                <li><strong>说明页目录：</strong>{html.escape(DOCS_BASE_PATH)}/</li>
+                <li><strong>接口根路径：</strong>/</li>
               </ul>
             </div>
 
@@ -503,7 +580,7 @@ def render_index() -> str:
           <div class="stack">
             <div class="card">
               <h2>命令测试接口</h2>
-              <p class="section-desc">这个区域始终公开显示。复制后把 <code>你的Token</code> 替换成任一有效 token 即可。</p>
+              <p class="section-desc">接口保持原始路径，不受说明页目录影响。</p>
 
               <h3 style="margin:18px 0 6px;">健康检查</h3>
               <pre id="healthCmd">curl "__BASE_ORIGIN__/healthz" \\
@@ -554,6 +631,7 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
         let verifiedToken = "";
         const defaultText = {html.escape(repr(DEFAULT_TEST_TEXT))};
         const TOKEN_STORAGE_KEY = "local_stt_adapter_token";
+        const DOCS_BASE_PATH = {html.escape(repr(DOCS_BASE_PATH))};
 
         const verifyForm = document.getElementById("verifyForm");
         const verifyMessage = document.getElementById("verifyMessage");
@@ -586,6 +664,7 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
 
         function buildDynamicCommands() {{
           const base = window.location.origin;
+
           document.getElementById("healthCmd").innerText =
 `curl "${{base}}/healthz" \\
   -H "Authorization: Bearer 你的Token"`;
@@ -602,7 +681,7 @@ openclaw config set tools.media.audio.maxBytes '20971520'
 openclaw config set tools.media.audio.timeoutSeconds '120'
 openclaw config set tools.media.audio.echoTranscript 'false'
 openclaw config set tools.media.audio.baseUrl '"${{base}}/v1"'
-openclaw config set tools.media.audio.headers '{"Authorization":"Bearer 你的Token"}'
+openclaw config set tools.media.audio.headers '{{"Authorization":"Bearer 你的Token"}}'
 openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"whisper-1"}}]'`;
         }}
 
@@ -685,7 +764,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
           try {{
             setLoading(verifyLoading, verifyBtn, true);
 
-            const resp = await fetch("/verify-json", {{
+            const resp = await fetch(`/verify-json`, {{
               method: "POST",
               body: formData,
               signal: controller.signal
@@ -764,7 +843,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
 
           try {{
             setLoading(uploadLoading, uploadBtn, true);
-            const resp = await fetch("/test-json", {{
+            const resp = await fetch(`/test-json`, {{
               method: "POST",
               body: formData
             }});
@@ -798,7 +877,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
 
           try {{
             setLoading(textLoading, textTestBtn, true);
-            const resp = await fetch("/test-text-json", {{
+            const resp = await fetch(`/test-text-json`, {{
               method: "POST",
               body: formData
             }});
@@ -839,7 +918,17 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index():
+async def root_page():
+    return HTMLResponse(render_root_landing())
+
+
+@app.get(DOCS_BASE_PATH, include_in_schema=False)
+async def redirect_docs():
+    return RedirectResponse(url=f"{DOCS_BASE_PATH}/")
+
+
+@app.get(f"{DOCS_BASE_PATH}/", response_class=HTMLResponse)
+async def docs_page():
     return HTMLResponse(render_index())
 
 

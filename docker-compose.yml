@@ -1,6 +1,6 @@
 services:
   local-stt-adapter:
-    build: .
+    image: ghcr.io/ldxw/local-stt-adapter:latest
     container_name: local-stt-adapter
     restart: unless-stopped
     ports:
@@ -10,14 +10,22 @@ services:
       WHISPER_DEVICE: ${WHISPER_DEVICE}
       WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE}
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE}
+
+      # 单密钥兼容
       API_TOKEN: ${API_TOKEN}
+
+      # 多密钥，逗号分隔
+      API_TOKENS: ${API_TOKENS}
+
+      # CORS 白名单，逗号分隔；允许全部可写 *
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
     volumes:
       - ./models:/root/.cache/huggingface
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "python -c \"import os,urllib.request; req=urllib.request.Request('http://127.0.0.1:8080/healthz', headers={'Authorization':'Bearer ' + os.environ['API_TOKEN']}); urllib.request.urlopen(req, timeout=10).read()\""
+          "python -c \"import os,urllib.request; raw=(os.environ.get('API_TOKEN') or ''); multi=os.environ.get('API_TOKENS',''); token=raw or next((x.strip() for x in multi.split(',') if x.strip()), ''); req=urllib.request.Request('http://127.0.0.1:8080/healthz', headers={'Authorization':'Bearer ' + token}); urllib.request.urlopen(req, timeout=10).read()\""
         ]
       interval: 30s
       timeout: 10s

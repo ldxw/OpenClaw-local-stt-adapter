@@ -172,69 +172,33 @@ def save_preview_audio(source_path: str) -> str:
     return f"/preview/{target_name}"
 
 
-def render_root_landing() -> str:
-    entry = f"{DOCS_BASE_PATH}/" if DOCS_BASE_PATH else "/"
-    return f"""
+def render_root_not_found() -> str:
+    return """
     <!doctype html>
-    <html lang="zh-CN">
+    <html lang="en">
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Local STT Adapter</title>
+      <title>Not Found</title>
       <style>
-        body {{
+        body {
           margin: 0;
-          font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-          background: #f6f8fb;
-          color: #172033;
-        }}
-        .wrap {{
-          max-width: 760px;
-          margin: 72px auto;
-          padding: 0 16px;
-        }}
-        .card {{
-          background: #fff;
-          border: 1px solid #e6eaf2;
-          border-radius: 20px;
-          padding: 28px;
-          box-shadow: 0 8px 32px rgba(17,24,39,.08);
-        }}
-        h1 {{
-          margin: 0 0 10px;
-          font-size: 30px;
-        }}
-        p {{
-          color: #667085;
-          line-height: 1.7;
-        }}
-        a.btn {{
-          display: inline-block;
-          margin-top: 16px;
-          background: #2563eb;
-          color: #fff;
-          text-decoration: none;
-          padding: 12px 18px;
-          border-radius: 12px;
-          font-weight: 700;
-        }}
-        code {{
-          background: #f3f4f6;
-          padding: 2px 6px;
-          border-radius: 6px;
-        }}
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          background: #ffffff;
+          color: #111827;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+        }
+        pre {
+          font-size: 20px;
+          margin: 0;
+        }
       </style>
     </head>
     <body>
-      <div class="wrap">
-        <div class="card">
-          <h1>Local STT Adapter</h1>
-          <p>这是服务默认首页。</p>
-          <p>说明页面入口：</p>
-          <p><code>{html.escape(entry)}</code></p>
-          <a class="btn" href="{html.escape(entry)}">打开说明页面</a>
-        </div>
-      </div>
+      <pre>{"detail":"Not Found"}</pre>
     </body>
     </html>
     """
@@ -494,7 +458,7 @@ def render_index() -> str:
                 <li><strong>鉴权状态：</strong>{token_hint}</li>
                 <li><strong>多密钥数量：</strong>{len(API_TOKENS)}</li>
                 <li><strong>CORS 允许来源：</strong>{html.escape(cors_hint)}</li>
-                <li><strong>说明页目录：</strong>{html.escape((DOCS_BASE_PATH or "/") + ("" if not DOCS_BASE_PATH else "/"))}</li>
+                <li><strong>说明页目录：</strong>{html.escape((DOCS_BASE_PATH + "/") if DOCS_BASE_PATH else "/")}</li>
                 <li><strong>接口根路径：</strong>/</li>
               </ul>
             </div>
@@ -764,12 +728,22 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
           try {{
             setLoading(verifyLoading, verifyBtn, true);
 
-            const resp = await fetch(`/verify-json`, {{
+            const resp = await fetch("/verify-json", {{
               method: "POST",
               body: formData,
-              signal: controller.signal
+              signal: controller.signal,
+              cache: "no-store"
             }});
-            const data = await resp.json();
+
+            const contentType = resp.headers.get("content-type") || "";
+            let data = null;
+
+            if (contentType.includes("application/json")) {{
+              data = await resp.json();
+            }} else {{
+              const text = await resp.text();
+              throw new Error(`服务未返回 JSON：${{text.slice(0, 200)}}`);
+            }}
 
             if (!resp.ok || !data.ok) {{
               localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -783,9 +757,9 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
             return true;
           }} catch (err) {{
             if (err.name === "AbortError") {{
-              setVerifyError("验证超时，请检查页面域名、反代或 CORS 配置。");
+              setVerifyError("验证超时，请检查反代、CORS 或接口连通性。");
             }} else {{
-              setVerifyError("请求失败：" + err);
+              setVerifyError("请求失败：" + err.message);
             }}
             return false;
           }} finally {{
@@ -843,9 +817,10 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
 
           try {{
             setLoading(uploadLoading, uploadBtn, true);
-            const resp = await fetch(`/test-json`, {{
+            const resp = await fetch("/test-json", {{
               method: "POST",
-              body: formData
+              body: formData,
+              cache: "no-store"
             }});
             const data = await resp.json();
 
@@ -856,7 +831,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
 
             renderUploadResult(data);
           }} catch (err) {{
-            renderError("上传测试失败", "请求失败：" + err);
+            renderError("上传测试失败", "请求失败：" + err.message);
           }} finally {{
             setLoading(uploadLoading, uploadBtn, false);
           }}
@@ -877,9 +852,10 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
 
           try {{
             setLoading(textLoading, textTestBtn, true);
-            const resp = await fetch(`/test-text-json`, {{
+            const resp = await fetch("/test-text-json", {{
               method: "POST",
-              body: formData
+              body: formData,
+              cache: "no-store"
             }});
             const data = await resp.json();
 
@@ -890,7 +866,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
 
             renderTextResult(data);
           }} catch (err) {{
-            renderError("文字测试失败", "请求失败：" + err);
+            renderError("文字测试失败", "请求失败：" + err.message);
           }} finally {{
             setLoading(textLoading, textTestBtn, false);
           }}
@@ -904,11 +880,10 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
           buildDynamicCommands();
 
           const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+          setLoading(verifyLoading, verifyBtn, false);
+
           if (savedToken) {{
             tokenInput.value = savedToken;
-            await verifyToken(savedToken, true);
-          }} else {{
-            setLoading(verifyLoading, verifyBtn, false);
           }}
         }});
       </script>
@@ -920,7 +895,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
 if DOCS_BASE_PATH:
     @app.get("/", response_class=HTMLResponse)
     async def root_page():
-        return HTMLResponse(render_root_landing())
+        return HTMLResponse(render_root_not_found())
 
     @app.get(DOCS_BASE_PATH, include_in_schema=False)
     async def redirect_docs():

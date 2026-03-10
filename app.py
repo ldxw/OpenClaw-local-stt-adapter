@@ -147,234 +147,519 @@ def render_index() -> str:
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>Local STT Adapter</title>
       <style>
+        :root {{
+          --bg: #f5f7fb;
+          --card: rgba(255,255,255,0.88);
+          --card-strong: #ffffff;
+          --text: #172033;
+          --muted: #667085;
+          --line: #e6eaf2;
+          --primary: #3b82f6;
+          --primary-hover: #2563eb;
+          --secondary: #374151;
+          --secondary-hover: #1f2937;
+          --success-bg: #ecfdf3;
+          --success-border: #b7ebc6;
+          --success-text: #166534;
+          --error-bg: #fef2f2;
+          --error-border: #fecaca;
+          --error-text: #991b1b;
+          --shadow: 0 8px 32px rgba(17, 24, 39, 0.08);
+          --radius: 18px;
+        }}
+
+        * {{
+          box-sizing: border-box;
+        }}
+
         body {{
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC",
+          margin: 0;
+          font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC",
                        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-          max-width: 1080px;
-          margin: 40px auto;
-          padding: 0 16px;
-          color: #222;
-          line-height: 1.65;
-          background: #f7f7f8;
+          color: var(--text);
+          background:
+            radial-gradient(circle at top left, rgba(59,130,246,0.08), transparent 30%),
+            radial-gradient(circle at top right, rgba(16,185,129,0.06), transparent 24%),
+            var(--bg);
         }}
-        h1 {{ margin-bottom: 8px; }}
+
+        .container {{
+          max-width: 1120px;
+          margin: 0 auto;
+          padding: 28px 16px 48px;
+        }}
+
+        .hero {{
+          position: relative;
+          overflow: hidden;
+          border: 1px solid rgba(255,255,255,0.55);
+          background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(248,250,252,0.88));
+          box-shadow: var(--shadow);
+          border-radius: 24px;
+          padding: 28px 24px;
+          margin-bottom: 20px;
+          backdrop-filter: blur(8px);
+        }}
+
+        .hero::after {{
+          content: "";
+          position: absolute;
+          right: -50px;
+          top: -50px;
+          width: 180px;
+          height: 180px;
+          background: radial-gradient(circle, rgba(59,130,246,0.14), transparent 70%);
+          pointer-events: none;
+        }}
+
+        .hero h1 {{
+          margin: 0 0 8px;
+          font-size: 32px;
+          line-height: 1.15;
+          letter-spacing: -0.02em;
+        }}
+
+        .hero p {{
+          margin: 0;
+          color: var(--muted);
+          font-size: 15px;
+        }}
+
+        .hero-top {{
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-bottom: 10px;
+        }}
+
+        .badge {{
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: #eef2f7;
+          color: #334155;
+          border: 1px solid #dde4ee;
+        }}
+
+        .badge.ok {{
+          background: #e9f9ee;
+          border-color: #bce8c9;
+          color: #166534;
+        }}
+
+        .grid {{
+          display: grid;
+          grid-template-columns: 1.1fr 0.9fr;
+          gap: 18px;
+        }}
+
         .card {{
-          border: 1px solid #e5e7eb;
-          border-radius: 14px;
-          padding: 18px;
-          margin: 16px 0;
-          background: #fff;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+          border: 1px solid rgba(230,234,242,0.95);
+          border-radius: var(--radius);
+          padding: 20px;
+          background: var(--card);
+          box-shadow: var(--shadow);
+          backdrop-filter: blur(8px);
         }}
-        code, pre, textarea {{
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+        .card h2 {{
+          margin: 0 0 10px;
+          font-size: 18px;
+          letter-spacing: -0.01em;
         }}
-        pre {{
-          background: #111827;
-          color: #f9fafb;
-          padding: 14px;
-          border-radius: 10px;
-          overflow-x: auto;
-          white-space: pre-wrap;
-          word-break: break-word;
+
+        .card p {{
+          margin: 0 0 8px;
         }}
-        .muted {{ color: #666; }}
-        ul {{ padding-left: 20px; }}
+
+        .muted {{
+          color: var(--muted);
+        }}
+
+        .stack {{
+          display: grid;
+          gap: 18px;
+        }}
+
+        .meta-list {{
+          margin: 0;
+          padding-left: 18px;
+          color: var(--text);
+        }}
+
+        .meta-list li {{
+          margin: 6px 0;
+        }}
+
         label {{
           display: block;
           font-weight: 600;
-          margin: 12px 0 6px;
+          margin: 14px 0 8px;
+          font-size: 14px;
         }}
-        input[type="text"], input[type="password"], select, textarea {{
+
+        input[type="text"],
+        input[type="password"],
+        select,
+        textarea {{
           width: 100%;
-          box-sizing: border-box;
-          border: 1px solid #d1d5db;
-          border-radius: 10px;
-          padding: 10px 12px;
+          border: 1px solid #d6dce7;
+          border-radius: 12px;
+          padding: 12px 14px;
           font-size: 14px;
           background: #fff;
+          color: var(--text);
+          outline: none;
+          transition: border-color .15s ease, box-shadow .15s ease;
         }}
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        select:focus,
+        textarea:focus {{
+          border-color: rgba(59,130,246,0.65);
+          box-shadow: 0 0 0 4px rgba(59,130,246,0.10);
+        }}
+
         textarea {{
-          min-height: 120px;
+          min-height: 132px;
           resize: vertical;
         }}
+
         input[type="file"] {{
           display: block;
-          margin-top: 8px;
+          width: 100%;
+          padding: 10px 0 2px;
         }}
-        button {{
-          margin-top: 16px;
-          border: 0;
-          border-radius: 10px;
-          padding: 10px 18px;
-          font-size: 14px;
-          font-weight: 600;
-          background: #2563eb;
-          color: #fff;
-          cursor: pointer;
-        }}
-        button:hover {{
-          background: #1d4ed8;
-        }}
+
         .row {{
           display: flex;
           gap: 12px;
           flex-wrap: wrap;
         }}
+
         .row > * {{
-          flex: 1 1 auto;
+          flex: 1 1 220px;
         }}
+
+        button {{
+          margin-top: 16px;
+          border: 0;
+          border-radius: 12px;
+          padding: 11px 16px;
+          font-size: 14px;
+          font-weight: 700;
+          background: var(--primary);
+          color: #fff;
+          cursor: pointer;
+          transition: transform .08s ease, background-color .15s ease, opacity .15s ease;
+        }}
+
+        button:hover {{
+          background: var(--primary-hover);
+        }}
+
+        button:active {{
+          transform: translateY(1px);
+        }}
+
+        button:disabled {{
+          opacity: .65;
+          cursor: not-allowed;
+        }}
+
+        .copy-btn,
+        .ghost-btn {{
+          background: var(--secondary);
+        }}
+
+        .copy-btn:hover,
+        .ghost-btn:hover {{
+          background: var(--secondary-hover);
+        }}
+
         .result {{
-          background: #f9fafb;
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          padding: 14px;
+          background: #fbfcfe;
+          border: 1px solid var(--line);
+          border-radius: 14px;
+          padding: 16px;
         }}
-        .error {{
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          color: #991b1b;
-          border-radius: 10px;
-          padding: 14px;
-        }}
+
         .success {{
-          background: #f0fdf4;
-          border: 1px solid #bbf7d0;
-          color: #166534;
-          border-radius: 10px;
+          background: var(--success-bg);
+          border: 1px solid var(--success-border);
+          color: var(--success-text);
+          border-radius: 12px;
           padding: 14px;
         }}
-        .badge {{
-          display: inline-block;
+
+        .error {{
+          background: var(--error-bg);
+          border: 1px solid var(--error-border);
+          color: var(--error-text);
+          border-radius: 12px;
+          padding: 14px;
+        }}
+
+        pre {{
+          margin: 10px 0 0;
+          background: #0f172a;
+          color: #f8fafc;
+          padding: 14px;
+          border-radius: 14px;
+          overflow-x: auto;
+          white-space: pre-wrap;
+          word-break: break-word;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          line-height: 1.55;
+        }}
+
+        code, textarea {{
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }}
+
+        details {{
+          margin-top: 12px;
+          border: 1px solid #e5eaf3;
+          border-radius: 14px;
+          background: rgba(250,251,253,0.92);
+          overflow: hidden;
+        }}
+
+        details[open] {{
+          background: rgba(247,249,252,0.98);
+        }}
+
+        summary {{
+          cursor: pointer;
+          font-weight: 700;
+          padding: 14px 16px;
+          user-select: none;
+          list-style: none;
+        }}
+
+        summary::-webkit-details-marker {{
+          display: none;
+        }}
+
+        summary::after {{
+          content: "展开";
+          float: right;
+          font-weight: 600;
           font-size: 12px;
-          padding: 4px 10px;
-          border-radius: 999px;
-          background: #e5e7eb;
-          color: #111827;
-          margin-left: 8px;
-          vertical-align: middle;
+          color: var(--muted);
         }}
-        .badge.ok {{
-          background: #dcfce7;
-          color: #166534;
+
+        details[open] summary::after {{
+          content: "收起";
         }}
+
+        .details-body {{
+          padding: 0 16px 16px;
+        }}
+
         audio {{
           width: 100%;
-          margin-top: 8px;
+          margin-top: 10px;
         }}
+
         .hidden {{
           display: none;
         }}
-        .copy-btn {{
-          background: #374151;
+
+        .section-title {{
+          margin: 0 0 4px;
+          font-size: 18px;
         }}
-        .copy-btn:hover {{
-          background: #1f2937;
+
+        .section-desc {{
+          margin: 0;
+          color: var(--muted);
+          font-size: 14px;
+        }}
+
+        .loading {{
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--muted);
+          font-size: 14px;
+          margin-top: 12px;
+        }}
+
+        .spinner {{
+          width: 16px;
+          height: 16px;
+          border: 2px solid rgba(59,130,246,0.2);
+          border-top-color: var(--primary);
+          border-radius: 50%;
+          animation: spin .8s linear infinite;
+        }}
+
+        @keyframes spin {{
+          to {{ transform: rotate(360deg); }}
+        }}
+
+        @media (max-width: 900px) {{
+          .grid {{
+            grid-template-columns: 1fr;
+          }}
+
+          .hero h1 {{
+            font-size: 26px;
+          }}
         }}
       </style>
     </head>
     <body>
-      <h1>Local STT Adapter <span id="verifyBadge" class="badge">请先验证密钥</span></h1>
-      <p class="muted">纯本地语音转写适配服务，兼容 OpenAI 风格的 <code>/v1/audio/transcriptions</code> 接口。</p>
-
-      <div class="card">
-        <h2>当前配置</h2>
-        <ul>
-          <li><strong>模型</strong>：{html.escape(MODEL_SIZE)}</li>
-          <li><strong>设备</strong>：{html.escape(DEVICE)}</li>
-          <li><strong>计算类型</strong>：{html.escape(COMPUTE_TYPE)}</li>
-          <li><strong>默认语言</strong>：{html.escape(DEFAULT_LANGUAGE)}</li>
-          <li><strong>鉴权状态</strong>：{token_hint}</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <h2>第一步：验证密钥</h2>
-        <form id="verifyForm">
-          <label for="token">Token</label>
-          <input id="token" name="token" type="password" placeholder="只填 token 本身，不要加 Bearer" />
-          <div class="row">
-            <button type="submit">验证密钥</button>
-            <button type="button" id="clearSavedTokenBtn" class="copy-btn">清除本地保存密钥</button>
+      <div class="container">
+        <section class="hero">
+          <div class="hero-top">
+            <h1>Local STT Adapter</h1>
+            <span id="verifyBadge" class="badge">请先验证密钥</span>
           </div>
-        </form>
-        <div id="verifyMessage"></div>
-      </div>
+          <p>纯本地语音转写适配服务，兼容 OpenAI 风格的 <code>/v1/audio/transcriptions</code> 接口。支持网页在线测试、文字生成语音试听，以及 OpenClaw 对接示例。</p>
+        </section>
 
-      <div class="card">
-        <h2>命令测试接口</h2>
-        <p class="muted">这个区域始终显示，不需要先验证密钥。把下面命令中的 <code>你的Token</code> 替换成真实 token 即可。</p>
-        <div class="row">
-          <button type="button" id="copyHealthBtn" class="copy-btn">复制健康检查命令</button>
-          <button type="button" id="copyTranscribeBtn" class="copy-btn">复制转写命令</button>
-        </div>
-        <pre id="healthCmd">curl "http://127.0.0.1:8080/healthz" \\
+        <div class="grid">
+          <div class="stack">
+            <div class="card">
+              <h2 class="section-title">当前配置</h2>
+              <p class="section-desc">这里显示当前服务运行参数，方便确认模型和设备是否符合预期。</p>
+              <ul class="meta-list">
+                <li><strong>模型：</strong>{html.escape(MODEL_SIZE)}</li>
+                <li><strong>设备：</strong>{html.escape(DEVICE)}</li>
+                <li><strong>计算类型：</strong>{html.escape(COMPUTE_TYPE)}</li>
+                <li><strong>默认语言：</strong>{html.escape(DEFAULT_LANGUAGE)}</li>
+                <li><strong>鉴权状态：</strong>{token_hint}</li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <h2 class="section-title">第一步：验证密钥</h2>
+              <p class="section-desc">只填写 token 本身，不要加 <code>Bearer</code> 前缀。验证成功后，在线测试区域会自动展开。</p>
+              <form id="verifyForm">
+                <label for="token">Token</label>
+                <input id="token" name="token" type="password" placeholder="输入你的 API Token" />
+                <div class="row">
+                  <button type="submit" id="verifyBtn">验证密钥</button>
+                  <button type="button" id="clearSavedTokenBtn" class="ghost-btn">清除本地保存密钥</button>
+                </div>
+              </form>
+              <div id="verifyLoading" class="loading hidden">
+                <span class="spinner"></span>
+                <span>正在验证密钥…</span>
+              </div>
+              <div id="verifyMessage"></div>
+            </div>
+
+            <div id="testingSection" class="hidden stack">
+              <div class="card">
+                <h2 class="section-title">在线测试：上传音频</h2>
+                <p class="section-desc">上传一段音频文件，直接查看转写结果。</p>
+                <form id="uploadTestForm">
+                  <label for="language">语言</label>
+                  <select id="language" name="language">
+                    <option value="">自动/默认</option>
+                    <option value="zh" selected>中文 zh</option>
+                    <option value="en">英文 en</option>
+                    <option value="ja">日文 ja</option>
+                    <option value="ko">韩文 ko</option>
+                  </select>
+
+                  <label for="audio_file">音频文件</label>
+                  <input id="audio_file" name="audio_file" type="file" accept=".wav,.mp3,.ogg,.m4a,.aac,.flac,.webm" required />
+
+                  <button type="submit" id="uploadBtn">上传并转写</button>
+                </form>
+                <div id="uploadLoading" class="loading hidden">
+                  <span class="spinner"></span>
+                  <span>正在转写音频…</span>
+                </div>
+              </div>
+
+              <div class="card">
+                <h2 class="section-title">在线测试：文字生成语音并转写</h2>
+                <p class="section-desc">输入文本，生成本地测试语音，再自动做转写校验。</p>
+                <form id="textTestForm">
+                  <label for="language2">语言</label>
+                  <select id="language2" name="language">
+                    <option value="zh" selected>中文 zh</option>
+                    <option value="en">英文 en</option>
+                    <option value="ja">日文 ja</option>
+                    <option value="ko">韩文 ko</option>
+                  </select>
+
+                  <label for="voice_gender">语音性别</label>
+                  <select id="voice_gender" name="voice_gender">
+                    <option value="female" selected>女声</option>
+                    <option value="male">男声</option>
+                  </select>
+
+                  <label for="text">测试文本</label>
+                  <textarea id="text" name="text">{default_text}</textarea>
+
+                  <div class="row">
+                    <button type="button" id="fillDefaultBtn" class="copy-btn">填入默认文字</button>
+                    <button type="submit" id="textTestBtn">生成语音、播放并转写</button>
+                  </div>
+                </form>
+                <div id="textLoading" class="loading hidden">
+                  <span class="spinner"></span>
+                  <span>正在生成语音并转写…</span>
+                </div>
+              </div>
+            </div>
+
+            <div id="resultBox"></div>
+          </div>
+
+          <div class="stack">
+            <div class="card">
+              <h2 class="section-title">命令测试接口</h2>
+              <p class="section-desc">这个区域始终公开显示，不需要先验证密钥。复制后把 <code>你的Token</code> 替换成真实值即可。</p>
+              <div class="row">
+                <button type="button" id="copyHealthBtn" class="copy-btn">复制健康检查命令</button>
+                <button type="button" id="copyTranscribeBtn" class="copy-btn">复制转写命令</button>
+              </div>
+              <pre id="healthCmd">curl "http://127.0.0.1:8080/healthz" \\
   -H "Authorization: Bearer 你的Token"</pre>
-        <pre id="transcribeCmd">curl -X POST "http://127.0.0.1:8080/v1/audio/transcriptions" \\
+              <pre id="transcribeCmd">curl -X POST "http://127.0.0.1:8080/v1/audio/transcriptions" \\
   -H "Authorization: Bearer 你的Token" \\
   -F "file=@test.wav" \\
   -F "language=zh"</pre>
-      </div>
 
-      <div id="testingSection" class="hidden">
-        <div class="card">
-          <h2>在线测试：上传音频</h2>
-          <form id="uploadTestForm">
-            <label for="language">语言</label>
-            <select id="language" name="language">
-              <option value="">自动/默认</option>
-              <option value="zh" selected>中文 zh</option>
-              <option value="en">英文 en</option>
-              <option value="ja">日文 ja</option>
-              <option value="ko">韩文 ko</option>
-            </select>
-
-            <label for="audio_file">音频文件</label>
-            <input id="audio_file" name="audio_file" type="file" accept=".wav,.mp3,.ogg,.m4a,.aac,.flac,.webm" required />
-
-            <button type="submit">上传并转写</button>
-          </form>
-        </div>
-
-        <div class="card">
-          <h2>在线测试：文字生成语音并转写</h2>
-          <form id="textTestForm">
-            <label for="language2">语言</label>
-            <select id="language2" name="language">
-              <option value="zh" selected>中文 zh</option>
-              <option value="en">英文 en</option>
-              <option value="ja">日文 ja</option>
-              <option value="ko">韩文 ko</option>
-            </select>
-
-            <label for="voice_gender">语音性别</label>
-            <select id="voice_gender" name="voice_gender">
-              <option value="female" selected>女声</option>
-              <option value="male">男声</option>
-            </select>
-
-            <label for="text">测试文本</label>
-            <textarea id="text" name="text">{default_text}</textarea>
-
-            <div class="row">
-              <button type="button" id="fillDefaultBtn" class="copy-btn">填入默认文字</button>
-              <button type="submit">生成语音、播放并转写</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div id="resultBox"></div>
-
-      <div class="card">
-        <h2>OpenClaw 对接示例</h2>
-        <pre>openclaw config set tools.media.audio.enabled 'true'
+              <details>
+                <summary>查看 OpenClaw 对接示例</summary>
+                <div class="details-body">
+                  <pre>openclaw config set tools.media.audio.enabled 'true'
 openclaw config set tools.media.audio.maxBytes '20971520'
 openclaw config set tools.media.audio.timeoutSeconds '120'
 openclaw config set tools.media.audio.echoTranscript 'false'
 openclaw config set tools.media.audio.baseUrl '"http://127.0.0.1:8080/v1"'
 openclaw config set tools.media.audio.headers '{{"Authorization":"Bearer 你的Token"}}'
 openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"whisper-1"}}]'</pre>
+                </div>
+              </details>
+
+              <details>
+                <summary>查看 TTS 推荐策略</summary>
+                <div class="details-body">
+                  <pre>openclaw config set messages.tts.auto '"inbound"'
+openclaw config set messages.tts.mode '"final"'
+openclaw config set messages.tts.provider '"edge"'
+openclaw config set messages.tts.modelOverrides.enabled 'false'
+openclaw config set messages.tts.edge.enabled 'true'
+openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
       </div>
 
       <script>
@@ -389,6 +674,14 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
         const resultBox = document.getElementById("resultBox");
         const tokenInput = document.getElementById("token");
 
+        const verifyLoading = document.getElementById("verifyLoading");
+        const uploadLoading = document.getElementById("uploadLoading");
+        const textLoading = document.getElementById("textLoading");
+
+        const verifyBtn = document.getElementById("verifyBtn");
+        const uploadBtn = document.getElementById("uploadBtn");
+        const textTestBtn = document.getElementById("textTestBtn");
+
         function escapeHtml(str) {{
           return String(str)
             .replaceAll("&", "&amp;")
@@ -396,6 +689,11 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
             .replaceAll(">", "&gt;")
             .replaceAll('"', "&quot;")
             .replaceAll("'", "&#039;");
+        }}
+
+        function setLoading(el, btn, loading) {{
+          el.classList.toggle("hidden", !loading);
+          if (btn) btn.disabled = loading;
         }}
 
         function copyText(text) {{
@@ -424,7 +722,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
         function renderUploadResult(data) {{
           resultBox.innerHTML = `
             <div class="card">
-              <h2>上传测试结果</h2>
+              <h2 class="section-title">上传测试结果</h2>
               <div class="result">
                 <p><strong>文件名：</strong>${{escapeHtml(data.filename || "")}}</p>
                 <p><strong>识别语言：</strong>${{escapeHtml(data.language || "")}}</p>
@@ -439,7 +737,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
         function renderTextResult(data) {{
           resultBox.innerHTML = `
             <div class="card">
-              <h2>文字生成语音测试结果</h2>
+              <h2 class="section-title">文字生成语音测试结果</h2>
               <div class="result">
                 <p><strong>原始文本：</strong></p>
                 <pre>${{escapeHtml(data.original_text || "")}}</pre>
@@ -461,7 +759,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
         function renderError(title, message) {{
           resultBox.innerHTML = `
             <div class="card">
-              <h2>${{escapeHtml(title)}}</h2>
+              <h2 class="section-title">${{escapeHtml(title)}}</h2>
               <div class="error">${{escapeHtml(message)}}</div>
             </div>
           `;
@@ -472,6 +770,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
           formData.append("token", token);
 
           try {{
+            setLoading(verifyLoading, verifyBtn, true);
             const resp = await fetch("/verify-json", {{
               method: "POST",
               body: formData
@@ -491,6 +790,8 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
           }} catch (err) {{
             setVerifyError("请求失败：" + err);
             return false;
+          }} finally {{
+            setLoading(verifyLoading, verifyBtn, false);
           }}
         }}
 
@@ -542,6 +843,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
           formData.append("audio_file", fileInput.files[0]);
 
           try {{
+            setLoading(uploadLoading, uploadBtn, true);
             const resp = await fetch("/test-json", {{
               method: "POST",
               body: formData
@@ -556,6 +858,8 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
             renderUploadResult(data);
           }} catch (err) {{
             renderError("上传测试失败", "请求失败：" + err);
+          }} finally {{
+            setLoading(uploadLoading, uploadBtn, false);
           }}
         }});
 
@@ -573,6 +877,7 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
           formData.append("text", document.getElementById("text").value);
 
           try {{
+            setLoading(textLoading, textTestBtn, true);
             const resp = await fetch("/test-text-json", {{
               method: "POST",
               body: formData
@@ -587,6 +892,8 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
             renderTextResult(data);
           }} catch (err) {{
             renderError("文字测试失败", "请求失败：" + err);
+          }} finally {{
+            setLoading(textLoading, textTestBtn, false);
           }}
         }});
 

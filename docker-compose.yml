@@ -1,0 +1,15 @@
+services:
+  local-stt-adapter:
+    build: .
+    container_name: local-stt-adapter
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${STT_PORT}:8080"
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL}
+      WHISPER_DEVICE: ${WHISPER_DEVICE}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE}
+      DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE}
+      API_TOKEN: ${API_TOKEN}
+    volumes:
+      - ./models:/root/.cache/huggingface

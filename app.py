@@ -20,7 +20,7 @@ if DOCS_BASE_PATH:
         DOCS_BASE_PATH = "/" + DOCS_BASE_PATH
     DOCS_BASE_PATH = DOCS_BASE_PATH.rstrip("/")
 else:
-    DOCS_BASE_PATH = "/docs"
+    DOCS_BASE_PATH = ""
 
 MODEL_SIZE = os.getenv("WHISPER_MODEL") or "small"
 DEVICE = os.getenv("WHISPER_DEVICE") or "cpu"
@@ -173,6 +173,7 @@ def save_preview_audio(source_path: str) -> str:
 
 
 def render_root_landing() -> str:
+    entry = f"{DOCS_BASE_PATH}/" if DOCS_BASE_PATH else "/"
     return f"""
     <!doctype html>
     <html lang="zh-CN">
@@ -230,8 +231,8 @@ def render_root_landing() -> str:
           <h1>Local STT Adapter</h1>
           <p>这是服务默认首页。</p>
           <p>说明页面入口：</p>
-          <p><code>{html.escape(DOCS_BASE_PATH)}/</code></p>
-          <a class="btn" href="{html.escape(DOCS_BASE_PATH)}/">打开说明页面</a>
+          <p><code>{html.escape(entry)}</code></p>
+          <a class="btn" href="{html.escape(entry)}">打开说明页面</a>
         </div>
       </div>
     </body>
@@ -477,7 +478,7 @@ def render_index() -> str:
             <h1>Local STT Adapter Docs</h1>
             <span id="verifyBadge" class="badge">请先验证密钥</span>
           </div>
-          <p>这是说明页面。接口地址保持原始路径不变，只是说明页可以放在自定义二级目录下。</p>
+          <p>这是说明页面。接口地址保持原始路径不变，说明页可放在自定义目录下。</p>
         </section>
 
         <div class="grid">
@@ -493,7 +494,7 @@ def render_index() -> str:
                 <li><strong>鉴权状态：</strong>{token_hint}</li>
                 <li><strong>多密钥数量：</strong>{len(API_TOKENS)}</li>
                 <li><strong>CORS 允许来源：</strong>{html.escape(cors_hint)}</li>
-                <li><strong>说明页目录：</strong>{html.escape(DOCS_BASE_PATH)}/</li>
+                <li><strong>说明页目录：</strong>{html.escape((DOCS_BASE_PATH or "/") + ("" if not DOCS_BASE_PATH else "/"))}</li>
                 <li><strong>接口根路径：</strong>/</li>
               </ul>
             </div>
@@ -631,7 +632,6 @@ openclaw config set messages.tts.edge.voice '"zh-CN-XiaoxiaoNeural"'</pre>
         let verifiedToken = "";
         const defaultText = {html.escape(repr(DEFAULT_TEST_TEXT))};
         const TOKEN_STORAGE_KEY = "local_stt_adapter_token";
-        const DOCS_BASE_PATH = {html.escape(repr(DOCS_BASE_PATH))};
 
         const verifyForm = document.getElementById("verifyForm");
         const verifyMessage = document.getElementById("verifyMessage");
@@ -917,19 +917,22 @@ openclaw config set tools.media.audio.models '[{{"provider":"openai","model":"wh
     """
 
 
-@app.get("/", response_class=HTMLResponse)
-async def root_page():
-    return HTMLResponse(render_root_landing())
+if DOCS_BASE_PATH:
+    @app.get("/", response_class=HTMLResponse)
+    async def root_page():
+        return HTMLResponse(render_root_landing())
 
+    @app.get(DOCS_BASE_PATH, include_in_schema=False)
+    async def redirect_docs():
+        return RedirectResponse(url=f"{DOCS_BASE_PATH}/")
 
-@app.get(DOCS_BASE_PATH, include_in_schema=False)
-async def redirect_docs():
-    return RedirectResponse(url=f"{DOCS_BASE_PATH}/")
-
-
-@app.get(f"{DOCS_BASE_PATH}/", response_class=HTMLResponse)
-async def docs_page():
-    return HTMLResponse(render_index())
+    @app.get(f"{DOCS_BASE_PATH}/", response_class=HTMLResponse)
+    async def docs_page():
+        return HTMLResponse(render_index())
+else:
+    @app.get("/", response_class=HTMLResponse)
+    async def docs_page_root():
+        return HTMLResponse(render_index())
 
 
 @app.post("/verify-json")
